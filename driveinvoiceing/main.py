@@ -8,21 +8,17 @@ from oauth2client import client
 from oauth2client import tools
 from apiclient.http import MediaIoBaseDownload
 import io
-
-
-try:
-    import argparse
-    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
-except ImportError:
-    flags = None
+import json
+import argparse
 
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/drive-python-quickstart.json
-# https://www.googleapis.com/auth/documents
 SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/documents'
-#CLIENT_SECRET_FILE = 'client_secret.json'
-CLIENT_SECRET_FILE = 'secret1.json'
+CLIENT_SECRET_FILE = 'secret.json'
 APPLICATION_NAME = 'Drive Invoicing'
+SCRIPT_ID = 'MQVDLm6PA-4WSCs1YNzsXtfeXYCx8nRBo'
+
+flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args(args=[])
 
 
 def get_credentials():
@@ -39,17 +35,14 @@ def get_credentials():
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,
-                                   'drive-python-quickstart.json')
+                                   'drive_invoicing.json')
 
     store = oauth2client.file.Storage(credential_path)
     credentials = store.get()
     if not credentials or credentials.invalid:
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
         flow.user_agent = APPLICATION_NAME
-        if flags:
-            credentials = tools.run_flow(flow, store, flags)
-        else: # Needed only for compatibility with Python 2.6
-            credentials = tools.run(flow, store)
+        credentials = tools.run_flow(flow, store, flags)
         print('Storing credentials to ' + credential_path)
     return credentials
 
@@ -117,12 +110,13 @@ def copy_file(service, original_id, new_file_name, folder_id):
 def download_file_as_ooffice(service, file_id, file_name):
     download_file_as(service, file_id, 'application/vnd.oasis.opendocument.text', file_name)
 
+
 def download_file_as_pdf(service, file_id, file_name):
     download_file_as(service, file_id, 'application/pdf', file_name)
 
+
 def download_file_as(service, file_id, media_type, file_name):
     request = service.files().export_media(fileId=file_id, mimeType=media_type)
-    #fh = io.BytesIO()
     fh = io.FileIO(file_name, mode='wb')
     downloader = MediaIoBaseDownload(fh, request)
     done = False
@@ -131,45 +125,52 @@ def download_file_as(service, file_id, media_type, file_name):
         print("Download %d%%." % int(status.progress() * 100))
 
 
-def main():
-    """Shows basic usage of the Google Drive API.
+def load_invoices(data_file_name):
+    json_data=open(data_file_name).read()
+    data = json.loads(json_data)
+    return data
 
-    Creates a Google Drive API service object and outputs the names and IDs
-    for up to 10 files.
+
+def main():
+    """The script load a file containing the invoices data and then print the one indicated.
     """
+
+    # Parse argument
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('data_file', metavar='F', type=str,
+                       help='path to the data file')
+    parser.add_argument('n_invoice', metavar='N', type=int,
+                       help='invoice to print')
+    args = parser.parse_args()
+
+    # Load the inboice and select the one to process
+    invoices = load_invoices(args.data_file)
+    if not str(args.n_invoice) in invoices:
+        print("Unknown invoice %i. Known invoices: %s" % (args.n_invoice, invoices.keys()))
+        return
+    invoice = invoices[str(args.n_invoice)]
+    invoice['number'] = args.n_invoice
+
+    # find the 'DriveInvoicing' directory and look for the file 'Template' inside it
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
-    service = discovery.build('drive', 'v3', http=http)
+    drive_service = discovery.build('drive', 'v3', http=http)
 
-    folder_id = get_folder(service, 'DriveInvoicing')['id']
-    template_id = get_content(service, 'Template', folder_id)['id']
-    print("template id %s" % template_id)
+    folder_id = get_folder(drive_service, 'DriveInvoicing')['id']
+    template_id = get_content(drive_service, 'Template', folder_id)['id']
 
-    invoice = {'number':20, 'date':{'day':11, 'month':'April', 'year':2016}, 'noVAT':True,
-               'client':{'name':'Pinco', 'address':'Via Foo','vatID':'FOO123','contact':'Mr. Pallo'},
-               'lines':[{'description':'Stuff done', 'amount':128.34, 'vatRate':20.0},
-               {'description':'Other Stuff', 'amount':80.0, 'vatRate':20.0},
-               {'description':'Third line', 'amount':85.0, 'vatRate':20.0}]}
+    # Copy the template
+    invoice_doc_id = copy_file(drive_service, template_id, 'Invoice_%i' % invoice['number'], folder_id)['id']
 
-    invoice_doc_id = copy_file(service, template_id, 'Invoice_%i' % invoice['number'], folder_id)['id']
-
+    # Run the script to fill the template
     script_service = discovery.build('script', 'v1', http=http)
     request = {"function": "insertData", "devMode": True, "parameters": [
         invoice_doc_id, invoice['number'], invoice['date'], invoice['noVAT'], invoice['client'], invoice['lines']]}
-    SCRIPT_ID = 'MQVDLm6PA-4WSCs1YNzsXtfeXYCx8nRBo'
     response = script_service.scripts().run(body=request, scriptId=SCRIPT_ID).execute()
-    #print(response)
-# 11,
-#              {'day':11, 'month':'April', 'year':2016},
-#              false,
-#              {'name':'Pinco', 'address':'Via dei pinchi palli','vatID':'FOO1234','contact':'Mr. Pallo'},
-#              [{'description':'Stuff done', 'amount':128.34, 'vatRate':20.0},
-#               {'description':'Other Stuff', 'amount':80.0, 'vatRate':20.0},
-#               {'description':'Third line', 'amount':85.0, 'vatRate':20.0}]);
+    print("Execution response: %s" % str(response))
 
-    download_file_as_pdf(service, invoice_doc_id, 'Invoice_%i.pdf' % invoice['number'])
-    #content = service.files().get_media(fileId=template_id).execute()
-    #print(content)
+    # Download the PDF file
+    download_file_as_pdf(drive_service, invoice_doc_id, 'Invoice_%i.pdf' % invoice['number'])
 
 if __name__ == '__main__':
     main()

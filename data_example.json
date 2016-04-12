@@ -1,0 +1,20 @@
+{
+  "11" : {
+    "date": {
+      "day":11,
+      "month":"April",
+      "year":2016
+    },
+    "noVAT": true,
+    "client": {
+      "name":    "Pinco",
+      "address": "Via Foo",
+      "vatID":   "FOO123",
+      "contact": "Mr. Pallo"},
+    "lines":[
+      {"description": "Stuff done",  "amount":128.34, "vatRate":20.0},
+      {"description": "Other Stuff", "amount":80.0,   "vatRate":20.0},
+      {"description": "Third line",  "amount":85.0,   "vatRate":20.0}
+    ]
+  }
+}
