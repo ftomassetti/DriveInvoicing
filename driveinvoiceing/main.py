@@ -8,7 +8,7 @@ from oauth2client import client
 from oauth2client import tools
 from apiclient.http import MediaIoBaseDownload
 import io
-import json
+import simplejson
 import argparse
 
 # If modifying these scopes, delete your previously saved credentials
@@ -45,24 +45,6 @@ def get_credentials():
         credentials = tools.run_flow(flow, store, flags)
         print('Storing credentials to ' + credential_path)
     return credentials
-
-
-def get_directory(service, folder_name):
-    page_token = None
-    res = []
-    while True:
-        response = service.files().list(q="mimeType = 'application/vnd.google-apps.folder' and name = '%s'" % folder_name,
-                                     spaces='drive',
-                                     fields='nextPageToken, files(id, name, properties)',
-                                     pageToken=page_token).execute()
-        for file in response.get('files', []):
-            res.append(file)
-        page_token = response.get('nextPageToken', None)
-        if page_token is None:
-            break;
-    if len(res) != 1:
-        raise Exception("Folder not found %s" % folder_name)
-    return res[0]
 
 
 def get_content(service, file_name, folder_id):
@@ -126,8 +108,8 @@ def download_file_as(service, file_id, media_type, file_name):
 
 
 def load_invoices(data_file_name):
-    json_data=open(data_file_name).read()
-    data = json.loads(json_data)
+    json_data = open(data_file_name).read()
+    data = simplejson.loads(json_data)
     return data
 
 
