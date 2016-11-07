@@ -146,8 +146,13 @@ def main():
 
     # Run the script to fill the template
     script_service = discovery.build('script', 'v1', http=http)
+    paymentDays = None
+    currency = invoice['currency']
+    if 'paymentDays' in invoice:
+        paymentDays = invoice['paymentDays']
     request = {"function": "insertData", "devMode": True, "parameters": [
-        invoice_doc_id, invoice['number'], invoice['date'], invoice['noVAT'], invoice['client'], invoice['lines']]}
+        invoice_doc_id, invoice['number'], invoice['date'], invoice['noVAT'], invoice['client'],
+        invoice['lines'], currency, paymentDays]}
     response = script_service.scripts().run(body=request, scriptId=SCRIPT_ID).execute()
     print("Execution response: %s" % str(response))
 
