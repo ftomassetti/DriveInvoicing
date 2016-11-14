@@ -18,6 +18,8 @@ CLIENT_SECRET_FILE = 'secret.json'
 APPLICATION_NAME = 'Drive Invoicing'
 SCRIPT_ID = 'MQVDLm6PA-4WSCs1YNzsXtfeXYCx8nRBo'
 
+DEFAULT_CURRENCY = 'Euro'
+
 flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args(args=[])
 
 
@@ -147,7 +149,9 @@ def main():
     # Run the script to fill the template
     script_service = discovery.build('script', 'v1', http=http)
     paymentDays = None
-    currency = invoice['currency']
+    currency = DEFAULT_CURRENCY
+    if 'currency' in invoice:
+        currency = invoice['currency']
     if 'paymentDays' in invoice:
         paymentDays = invoice['paymentDays']
     request = {"function": "insertData", "devMode": True, "parameters": [
