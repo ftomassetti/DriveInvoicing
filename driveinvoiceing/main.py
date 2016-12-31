@@ -114,6 +114,8 @@ def load_invoices(data_file_name):
     data = simplejson.loads(json_data)
     return data
 
+verbose = False
+
 
 def main():
     """The script load a file containing the invoices data and then print the one indicated.
@@ -125,7 +127,11 @@ def main():
                        help='path to the data file')
     parser.add_argument('n_invoice', metavar='N', type=int,
                        help='invoice to print')
+    parser.add_argument('-v', action='store_true')
     args = parser.parse_args()
+
+    global verbose
+    verbose = args.v
 
     # Load the inboice and select the one to process
     invoices = load_invoices(args.data_file)
@@ -134,6 +140,8 @@ def main():
         return
     invoice = invoices[str(args.n_invoice)]
     invoice['number'] = args.n_invoice
+    if 'template' not in invoice:
+        invoice['template'] = 'Template'
 
     # find the 'DriveInvoicing' directory and look for the file 'Template' inside it
     credentials = get_credentials()
@@ -141,7 +149,7 @@ def main():
     drive_service = discovery.build('drive', 'v3', http=http)
 
     folder_id = get_folder(drive_service, 'DriveInvoicing')['id']
-    template_id = get_content(drive_service, 'Template', folder_id)['id']
+    template_id = get_content(drive_service, invoice['template'], folder_id)['id']
 
     # Copy the template
     invoice_doc_id = copy_file(drive_service, template_id, 'Invoice_%i' % invoice['number'], folder_id)['id']
